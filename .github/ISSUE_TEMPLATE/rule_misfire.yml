@@ -1,0 +1,42 @@
+name: A rule misfires on my codebase
+description: A finding that is wrong, or a missing finding that should have fired
+labels: [heuristics]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful kind of issue to file. Several rules are in their
+        current shape because somebody reported exactly this.
+
+        Turn the rule off in `.graphlintrc.json` in the meantime — a workaround in
+        your source is worse than a disabled rule.
+  - type: input
+    id: rule
+    attributes:
+      label: Rule id
+      placeholder: unjustified-barrier
+    validations: { required: true }
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Which direction
+      options:
+        - It fired and it should not have (false positive)
+        - It did not fire and it should have (false negative)
+    validations: { required: true }
+  - type: textarea
+    id: code
+    attributes:
+      label: The code it read
+      description: Enough to reproduce. Redact freely — shape matters, names do not.
+      render: javascript
+    validations: { required: true }
+  - type: textarea
+    id: why
+    attributes:
+      label: Why the rule is wrong here
+      description: >
+        What does your architecture do that the rule cannot see? A barrier that is
+        load-bearing for a reason outside the file, auth enforced in a gateway, a
+        decorator factory — these are the cases that need naming.
+    validations: { required: true }

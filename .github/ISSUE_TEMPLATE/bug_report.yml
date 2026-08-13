@@ -1,0 +1,45 @@
+name: Bug report
+description: Something behaves differently from how it is documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a **false positive or false negative in a heuristic**, use the
+        "rule misfires" template instead — those are calibration, not bugs.
+  - type: input
+    id: repo
+    attributes:
+      label: Which tool
+      placeholder: graphlint 0.1.0
+    validations: { required: true }
+  - type: textarea
+    id: command
+    attributes:
+      label: The command you ran
+      render: shell
+    validations: { required: true }
+  - type: textarea
+    id: output
+    attributes:
+      label: What happened
+      description: Paste the output. `--format json` is the most useful form.
+      render: shell
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and where that is documented
+      description: A link to the README line or docs section helps a lot.
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: The smallest spec, workflow or route file that shows it.
+      render: javascript
+  - type: input
+    id: env
+    attributes:
+      label: Node version and OS
+      placeholder: node 22.11 / ubuntu 24.04

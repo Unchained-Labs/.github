@@ -1,0 +1,57 @@
+# Reusable CI for the TypeScript tools in this org.
+#
+# Call it from a repo with:
+#
+#   jobs:
+#     ci:
+#       uses: Unchained-Labs/.github/.github/workflows/node-ci.yml@main
+#       with:
+#         node-versions: '["20", "22"]'
+name: Reusable node CI
+
+on:
+  workflow_call:
+    inputs:
+      node-versions:
+        description: JSON array of Node versions to test against
+        required: false
+        type: string
+        default: '["20", "22"]'
+      run-lint:
+        description: Run `pnpm lint` if the package defines it
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ${{ fromJSON(inputs.node-versions) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Lint
+        if: ${{ inputs.run-lint }}
+        run: pnpm lint

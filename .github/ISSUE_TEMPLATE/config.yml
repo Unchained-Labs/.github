@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Unchained-Labs/.github/blob/main/SECURITY.md
+    about: Do not open a public issue. Private report or email.
+  - name: Question about how something works
+    url: https://github.com/orgs/Unchained-Labs/discussions
+    about: Ask here. If it needed asking, the docs were unclear.
+  - name: Brand assets and tokens
+    url: https://unchained-labs.github.io/branding/
+    about: Palette, mark, type, and the trademark notice.
