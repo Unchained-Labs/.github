@@ -1,8 +1,9 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/Unchained-Labs/branding/main/assets/logo/lockup-horizontal.svg" width="320" alt="Unchained Labs">
-  <h3>Linear execution is a chain.<br>The work is actually a graph.<br>These are the tools that make that affordable.</h3>
+  <h3>An agentic lab.<br>We ship a product that runs agents,<br>and the tooling we needed to run it correctly.</h3>
   <p><strong><a href="https://unchained-labs.github.io/">unchained-labs.github.io</a></strong></p>
   <p>
+    <a href="https://kymatics.vercel.app">Kymatics</a> ·
     <a href="https://unchained-labs.github.io/graphlint/">graphlint</a> ·
     <a href="https://unchained-labs.github.io/preflight/">preflight</a> ·
     <a href="https://unchained-labs.github.io/decorrelate/">decorrelate</a> ·
@@ -12,35 +13,67 @@
 </div>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Unchained-Labs/graphlint/main/docs/assets/demo.gif" width="720" alt="graphlint finding bugs in an agent workflow spec">
-  <br><sub><code>graphlint</code> — real output, 16 rules, zero tokens.
-  <a href="https://unchained-labs.github.io/">Every tool has a demo on the landing page →</a></sub>
+  <img src="https://raw.githubusercontent.com/Unchained-Labs/branding/main/assets/video/org-promo.gif" width="760" alt="The Unchained Labs stack: Kymatics running agents, and the tools that keep it correct">
+  <br><sub>Real output, both halves. <a href="https://unchained-labs.github.io/">Every project has a demo on the landing page →</a></sub>
 </div>
 
 ---
 
-**Infrastructure for agent graphs.** Running many agents in parallel is a
-capability most people now have. Running them *affordably and correctly* is a
-systems problem, and it is mostly unbuilt: nothing prices a workflow before it
-runs, nothing checks whether your verifiers are independent, nothing lints the
-spec for the handful of mistakes that everyone makes.
+Two halves of one bet: **that the useful unit of agent work is a graph, not a
+chat.** [Kymatics](#kymatics--the-product) is the product that runs those graphs
+for you. [The graph tools](#the-graph-tools) are what we built after running
+enough of them to know where it goes wrong.
 
-That gap is what this org is for.
+The second half exists because of the first. Every tool below was written to fix
+something we hit shipping Kymatics — and when we pointed them back at our own
+stack, two of them found real bugs, [including two in
+`authsweep` itself](https://github.com/Unchained-Labs/.github/blob/main/docs/kymatics-and-the-graph-tools.md).
 
-## The tools
+## Kymatics — the product
+
+**Speak an intent; get a built thing.** A voice-first pipeline that turns spoken
+work into queued agent jobs, runs them in isolated workspaces, and streams the
+build back to you live.
+
+| | What it is | Live | Stack |
+| :--- | :--- | :--- | :--- |
+| **[Kymatics](https://github.com/Unchained-Labs/kymatics)** | The umbrella and the landing page — voice in, structured work out. | [kymatics.vercel.app](https://kymatics.vercel.app) | — |
+| **[Otter](https://github.com/Unchained-Labs/otter)** | The orchestration engine. Queues and schedules prompts, runs each in an isolated workspace, streams events, keeps full job history, and reports token usage and cost per job. | [demo](https://otter-psi.vercel.app) | Rust · axum · Postgres · Redis |
+| **[Lavoix](https://github.com/Unchained-Labs/lavoix)** | Speech in and out. Provider-based STT/TTS with a FastAPI surface. | [demo](https://lavoix.vercel.app) | Python · FastAPI |
+| **[Seal](https://github.com/Unchained-Labs/seal)** | The frontend. A voice-first Kanban over Otter's queue, with live build output and previews. | [demo](https://seal-nine-sigma.vercel.app) | React · TypeScript |
+
+```mermaid
+flowchart LR
+  V(["voice"]) --> L["Lavoix<br><small>speech → text</small>"]
+  L --> S["Seal<br><small>intent → a card</small>"]
+  S --> O["Otter<br><small>card → a queued job</small>"]
+  O --> W(["isolated workspace<br><small>agent runs, output streams back</small>"])
+  W --> S
+```
+
+Otter is the interesting part, and it is the reason the rest of this org exists:
+once you are running agent jobs by the hundred, *correctness and cost stop being
+someone else's problem.*
+
+## The graph tools
+
+Running many agents in parallel is a capability most people now have. Running them
+**affordably and correctly** is a systems problem, and it was mostly unbuilt:
+nothing priced a workflow before it ran, nothing checked whether verifiers were
+independent, nothing linted the spec for the handful of mistakes everyone makes.
 
 | | What it does | Docs | Status |
 | :--- | :--- | :--- | :--- |
-| **[graphlint](https://github.com/Unchained-Labs/graphlint)** | Static analyzer for agent workflow specs. Catches barrier misuse, correlated verifiers, missing schemas and non-terminating cycles — before a token is spent. 16 rules, SARIF output. | [site](https://unchained-labs.github.io/graphlint/) · [demo](https://github.com/Unchained-Labs/graphlint#readme) | `alpha` |
-| **[preflight](https://github.com/Unchained-Labs/preflight)** | Prices a workflow before it runs and comments the predicted agent count and dollar cost on the PR that changed it. Dependabot, but for agent spend. | [site](https://unchained-labs.github.io/preflight/) · [demo](https://github.com/Unchained-Labs/preflight#readme) | `alpha` |
-| **[decorrelate](https://github.com/Unchained-Labs/decorrelate)** | Measures whether your verifiers are actually independent. Three skeptics sharing a model and a prompt are one check at 3× the price — this puts a number on it. | [site](https://unchained-labs.github.io/decorrelate/) · [demo](https://github.com/Unchained-Labs/decorrelate#readme) | `alpha` |
-| **[authsweep](https://github.com/Unchained-Labs/authsweep)** | Finds route handlers with no authorization check. Deterministic, zero tokens, evidence on every finding. | [site](https://unchained-labs.github.io/authsweep/) · [demo](https://github.com/Unchained-Labs/authsweep#readme) | `alpha` |
-| **[workflow-hub](https://github.com/Unchained-Labs/workflow-hub)** | Six agent workflows worth copying, one per shape. You own the file after it lands. | [site](https://unchained-labs.github.io/workflow-hub/) · [demo](https://github.com/Unchained-Labs/workflow-hub#readme) | `alpha` |
-| **[branding](https://github.com/Unchained-Labs/branding)** | The brand system. Measured contrast, computed geometry, tested docs. | [site](https://unchained-labs.github.io/branding/) · [demo](https://github.com/Unchained-Labs/branding#readme) | `v1` |
+| **[graphlint](https://github.com/Unchained-Labs/graphlint)** | Static analyzer for agent workflow specs. Catches barrier misuse, correlated verifiers, missing schemas and non-terminating cycles — before a token is spent. 16 rules, SARIF output. | [site](https://unchained-labs.github.io/graphlint/) | `alpha` |
+| **[preflight](https://github.com/Unchained-Labs/preflight)** | Prices a workflow before it runs and comments the predicted agent count and dollar cost on the PR that changed it. Dependabot, but for agent spend. | [site](https://unchained-labs.github.io/preflight/) | `alpha` |
+| **[decorrelate](https://github.com/Unchained-Labs/decorrelate)** | Measures whether your verifiers are actually independent. Three skeptics sharing a model and a prompt are one check at 3× the price — this puts a number on it. | [site](https://unchained-labs.github.io/decorrelate/) | `alpha` |
+| **[authsweep](https://github.com/Unchained-Labs/authsweep)** | Finds route handlers with no authorization check. Deterministic, zero tokens, evidence on every finding. | [site](https://unchained-labs.github.io/authsweep/) | `alpha` |
+| **[workflow-hub](https://github.com/Unchained-Labs/workflow-hub)** | Six agent workflows worth copying, one per shape. You own the file after it lands. | [site](https://unchained-labs.github.io/workflow-hub/) | `alpha` |
+| **[branding](https://github.com/Unchained-Labs/branding)** | The brand system. Measured contrast, computed geometry, tested docs. | [site](https://unchained-labs.github.io/branding/) | `v1` |
 
 Everything is MIT, alpha, and honest about it. Pin exact versions.
 
-## How they fit together
+### How they fit together
 
 ```mermaid
 flowchart LR
@@ -64,6 +97,26 @@ The family is self-consistent, and that is enforced rather than claimed:
 prices, and every workflow in `workflow-hub` passes `graphlint` with zero
 findings. CI fails if any of that stops being true.
 
+## What happened when we pointed them at our own product
+
+The honest test of internal tooling is whether it survives contact with the thing
+it was built for. We ran all five against Kymatics and
+[wrote down every result, including the negatives](https://github.com/Unchained-Labs/.github/blob/main/docs/kymatics-and-the-graph-tools.md):
+
+| Tool | On Kymatics | Outcome |
+| :--- | :--- | :--- |
+| **authsweep** → Lavoix | ✅ | Found two unauthenticated endpoints doing paid provider work. |
+| **preflight** ↔ Otter | ✅ | `preflight models --format otter-env` now feeds Otter's price list, so cost is quoted from one CI-checked table instead of two. |
+| **decorrelate** → Otter evals | ➖ | Nothing to add. Otter's evals already score against an executable oracle, which is the answer decorrelate would have given. |
+| **graphlint** → Otter jobs | ➖ | Does not apply. A single-prompt job is not a graph. |
+| **authsweep** → Otter | ❌ | Blocked — it cannot read Rust, so the control plane is invisible to it. |
+
+Two of five helped. The most valuable result was not an integration at all:
+**pointing a security scanner at our own code found two bugs in the scanner**,
+both of the one class its own threat model calls the worst — a false clean. Neither
+was reachable from its fixtures, because the fixtures were written by the same
+person as the rules and inherited the same blind spots.
+
 ## The argument, in six lines
 
 1. **An edge is data moving, not order.** Most "and then" in an agent script
@@ -84,16 +137,8 @@ Each tool enforces a subset of that mechanically, so it stops being advice.
 ## Everything is deployed
 
 Every repo has a docs site on GitHub Pages and a terminal demo built from real CLI
-output. The [landing page](https://unchained-labs.github.io/) collects all of them
-alongside the pipeline diagram and the argument each tool enforces.
-
-## Also here
-
-Voice-first orchestration, from before this org's focus narrowed —
-[Kymatics](https://github.com/Unchained-Labs/kymatics) (the umbrella),
-[Otter](https://github.com/Unchained-Labs/otter) (Rust orchestration engine),
-[Lavoix](https://github.com/Unchained-Labs/lavoix) (STT/TTS service) and
-[Seal](https://github.com/Unchained-Labs/seal) (the frontend).
+output; the Kymatics services are live at the links above. The
+[landing page](https://unchained-labs.github.io/) collects all of it.
 
 ## Contributing
 
@@ -106,6 +151,7 @@ Security reports: [SECURITY.md](https://github.com/Unchained-Labs/.github/blob/m
 
 <div align="center"><sub>
   <a href="https://unchained-labs.github.io/">Landing</a> ·
+  <a href="https://kymatics.vercel.app">Kymatics</a> ·
   <a href="https://unchained-labs.github.io/branding/">Brand</a> ·
   Built by <a href="https://github.com/guilyx">Erwin Lejeune</a> ·
   MIT
