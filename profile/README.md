@@ -1,6 +1,7 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/Unchained-Labs/branding/main/assets/logo/lockup-horizontal.svg" width="320" alt="Unchained Labs">
   <h3>Linear execution is a chain.<br>The work is actually a graph.<br>These are the tools that make that affordable.</h3>
+  <p><strong><a href="https://unchained-labs.github.io/">unchained-labs.github.io</a></strong></p>
   <p>
     <a href="https://unchained-labs.github.io/graphlint/">graphlint</a> ·
     <a href="https://unchained-labs.github.io/preflight/">preflight</a> ·
@@ -8,6 +9,12 @@
     <a href="https://unchained-labs.github.io/authsweep/">authsweep</a> ·
     <a href="https://unchained-labs.github.io/workflow-hub/">workflow-hub</a>
   </p>
+</div>
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/Unchained-Labs/graphlint/main/docs/assets/demo.gif" width="720" alt="graphlint finding bugs in an agent workflow spec">
+  <br><sub><code>graphlint</code> — real output, 16 rules, zero tokens.
+  <a href="https://unchained-labs.github.io/">Every tool has a demo on the landing page →</a></sub>
 </div>
 
 ---
@@ -22,14 +29,14 @@ That gap is what this org is for.
 
 ## The tools
 
-| | What it does | Status |
-| :--- | :--- | :--- |
-| **[graphlint](https://github.com/Unchained-Labs/graphlint)** | Static analyzer for agent workflow specs. Catches barrier misuse, correlated verifiers, missing schemas and non-terminating cycles — before a token is spent. 16 rules, SARIF output. | `alpha` |
-| **[preflight](https://github.com/Unchained-Labs/preflight)** | Prices a workflow before it runs and comments the predicted agent count and dollar cost on the PR that changed it. Dependabot, but for agent spend. | `alpha` |
-| **[decorrelate](https://github.com/Unchained-Labs/decorrelate)** | Measures whether your verifiers are actually independent. Three skeptics sharing a model and a prompt are one check at 3× the price — this puts a number on it. | `alpha` |
-| **[authsweep](https://github.com/Unchained-Labs/authsweep)** | Finds route handlers with no authorization check. Deterministic, zero tokens, evidence on every finding. | `alpha` |
-| **[workflow-hub](https://github.com/Unchained-Labs/workflow-hub)** | Six agent workflows worth copying, one per shape. You own the file after it lands. | `alpha` |
-| **[branding](https://github.com/Unchained-Labs/branding)** | The brand system. Measured contrast, computed geometry, tested docs. | `v1` |
+| | What it does | Docs | Status |
+| :--- | :--- | :--- | :--- |
+| **[graphlint](https://github.com/Unchained-Labs/graphlint)** | Static analyzer for agent workflow specs. Catches barrier misuse, correlated verifiers, missing schemas and non-terminating cycles — before a token is spent. 16 rules, SARIF output. | [site](https://unchained-labs.github.io/graphlint/) · [demo](https://github.com/Unchained-Labs/graphlint#readme) | `alpha` |
+| **[preflight](https://github.com/Unchained-Labs/preflight)** | Prices a workflow before it runs and comments the predicted agent count and dollar cost on the PR that changed it. Dependabot, but for agent spend. | [site](https://unchained-labs.github.io/preflight/) · [demo](https://github.com/Unchained-Labs/preflight#readme) | `alpha` |
+| **[decorrelate](https://github.com/Unchained-Labs/decorrelate)** | Measures whether your verifiers are actually independent. Three skeptics sharing a model and a prompt are one check at 3× the price — this puts a number on it. | [site](https://unchained-labs.github.io/decorrelate/) · [demo](https://github.com/Unchained-Labs/decorrelate#readme) | `alpha` |
+| **[authsweep](https://github.com/Unchained-Labs/authsweep)** | Finds route handlers with no authorization check. Deterministic, zero tokens, evidence on every finding. | [site](https://unchained-labs.github.io/authsweep/) · [demo](https://github.com/Unchained-Labs/authsweep#readme) | `alpha` |
+| **[workflow-hub](https://github.com/Unchained-Labs/workflow-hub)** | Six agent workflows worth copying, one per shape. You own the file after it lands. | [site](https://unchained-labs.github.io/workflow-hub/) · [demo](https://github.com/Unchained-Labs/workflow-hub#readme) | `alpha` |
+| **[branding](https://github.com/Unchained-Labs/branding)** | The brand system. Measured contrast, computed geometry, tested docs. | [site](https://unchained-labs.github.io/branding/) · [demo](https://github.com/Unchained-Labs/branding#readme) | `v1` |
 
 Everything is MIT, alpha, and honest about it. Pin exact versions.
 
@@ -74,6 +81,12 @@ findings. CI fails if any of that stops being true.
 
 Each tool enforces a subset of that mechanically, so it stops being advice.
 
+## Everything is deployed
+
+Every repo has a docs site on GitHub Pages and a terminal demo built from real CLI
+output. The [landing page](https://unchained-labs.github.io/) collects all of them
+alongside the pipeline diagram and the argument each tool enforces.
+
 ## Also here
 
 Voice-first orchestration, from before this org's focus narrowed —
@@ -92,6 +105,7 @@ needs a measurement, and a new rule needs a fixture that fails without it.
 Security reports: [SECURITY.md](https://github.com/Unchained-Labs/.github/blob/main/SECURITY.md).
 
 <div align="center"><sub>
+  <a href="https://unchained-labs.github.io/">Landing</a> ·
   <a href="https://unchained-labs.github.io/branding/">Brand</a> ·
   Built by <a href="https://github.com/guilyx">Erwin Lejeune</a> ·
   MIT
