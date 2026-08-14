@@ -4,10 +4,15 @@ Written August 2026, after building the five graph tools and then pointing them 
 our own product. The question was whether they actually help Kymatics or whether
 they are a separate hobby that happens to live in the same org.
 
-**Short answer: two of the five help today, one of those found real bugs on first
-contact, and two do not apply at all yet.** The negatives are the useful part of
-this document — a report where all five tools turned out to help would tell you
-nothing except that the author wanted them to.
+**Short answer: three of the five help today, two of those found real bugs on
+first contact, and two do not apply at all yet.** The negatives are the useful
+part of this document — a report where all five tools turned out to help would
+tell you nothing except that the author wanted them to.
+
+The third only counts because the exercise itself produced the missing piece:
+authsweep could not read Rust, so it was written to. That is the honest shape of
+dogfooding — the gap was not "Otter needs work", it was "our tool cannot see
+our own control plane".
 
 ## The stack, for orientation
 
@@ -174,36 +179,73 @@ engine, and the spec format already exists.
 
 ---
 
-## 5. authsweep → Otter — blocked on a missing front-end
+## 5. authsweep → Otter — was blocked, so we unblocked it
 
-**Status: real gap, concrete work.**
+**Status: works now, and it is the most serious finding in this document.**
 
-Otter's HTTP surface is the control plane: `/v1/jobs`, `/v1/projects`,
-`/v1/jobs/{id}/preview-url`, `/metrics`, plus workspace filesystem endpoints that
-read files out of a build workspace. Some of those are exactly the shape authsweep
-rates `high` — a filesystem read keyed by an id, a mutating endpoint that
-registers a preview URL.
+Otter's HTTP surface *is* the control plane: `/v1/jobs`, `/v1/projects`,
+`/v1/workspaces/{id}/command`, `/metrics`, plus workspace filesystem endpoints
+that read files out of a build workspace.
 
-authsweep reads Express, Fastify, Koa, FastAPI and Flask. **Otter is axum, and
-authsweep does not read Rust at all**, so its control plane is invisible to the
-tool.
-
-Pointing it at Otter anyway surfaced a second bug, from the opposite direction to
-the first. The scan found zero routes and printed **"every route has an
-authorization check"**, exiting `0`. A CI job would have gone green on a
+The first run found nothing, because authsweep read Express, Fastify, Koa,
+FastAPI and Flask — and Otter is axum. It printed **"every route has an
+authorization check"** and exited `0`. A CI job would have gone green on a
 completely unscanned control plane. Where the `Depends()` bug mis-read a guard,
-this one read nothing at all — and both make silence look like safety. Fixed in
-[`2b58024`](https://github.com/Unchained-Labs/authsweep/commit/2b58024): a
-zero-route scan now says plainly that nothing was examined, names the supported
-frameworks, and sets `summary.examinedNothing` so machines cannot misread it
-either.
+this one read nothing at all; both make silence look like safety. The immediate
+fix was to stop lying about it
+([`2b58024`](https://github.com/Unchained-Labs/authsweep/commit/2b58024)): a
+zero-route scan now says plainly that nothing was examined and sets
+`summary.examinedNothing`.
 
-A Rust front-end is a bounded piece of work: axum registers routes as
-`Router::new().route("/v1/jobs", post(handler))`, which is a call-expression shape
-very close to the Express extractor already in the codebase. Guards would come
-from `route_layer`/`middleware::from_fn` and extractor types in the handler
-signature. Until it exists, `authsweep` on this stack means "Lavoix only", and the
-README now says so.
+The real fix was to read Rust
+([`b3f9c76`](https://github.com/Unchained-Labs/authsweep/commit/b3f9c76)). axum,
+actix-web and rocket, token-structural rather than parser-based, resolving
+chained method routers, `nest`/`mount`/`scope` prefixes, and auth-looking
+extractor types in handler signatures. On Otter:
+
+```
+  authsweep  17 files · 38 routes · axum
+
+  prefilter  2 of 38 routes dropped before any agent ran
+
+  ✗ POST /v1/workspaces/{id}/command  otter-server/src/main.rs:244
+     .route("/v1/workspaces/{id}/command", post(run_workspace_command))
+     no authorization check found on or above this handler · POST changes state ·
+     executes code or shell commands · takes an id or wildcard
+
+  ✗ POST /v1/workspaces/command  otter-server/src/main.rs:245
+  ✗ GET  /v1/runtime/workspaces/{id}/shell/ws  otter-server/src/main.rs:271
+
+  3 high · 21 medium · 12 low
+```
+
+38 routes, exactly the 36 `.route()` calls plus the two that chain a second
+method. The two prefiltered are `/healthz` and `/metrics`.
+
+**Otter's control plane has no authorization at all.** That is a defensible
+choice for a localhost dev orchestrator and an indefensible one the moment it
+binds to anything else, and the three `high` findings say why: two of them accept
+a command and run it in a workspace, and the third is a shell over a websocket.
+This is the single most valuable thing any of the five tools has produced, and it
+was invisible until the tool could read the language the service is written in.
+
+### Writing it taught the tool three things the fixtures could not
+
+- **`web::scope("/admin").wrap(auth)` chains *after* its own arguments.** Scoping
+  the guard to the enclosing function marked every sibling route as covered — a
+  false clean over `/v1/secrets/{id}`. Prefixing constructs now own a region, and
+  where that region ends depends on the framework.
+- **Resolving `.mount("/api/v1", …)` broke the public-path list.** `/ping` became
+  `/api/v1/ping`, which a head-anchored pattern stopped recognising, so the tool
+  began reporting health checks *because it had got better at reading the router*.
+- **The severity table had no notion of code execution.** It was written against
+  CRUD apps, so unauthenticated `POST /workspaces/{id}/command` ranked level with
+  `POST /projects`. Rating remote code execution the same as "create a record" is
+  exactly the "teaches you to ignore both" failure the module's own docstring
+  warns about.
+
+None of those three is reachable from a fixture, because a fixture only contains
+the shapes its author already thought of.
 
 ---
 
@@ -212,15 +254,15 @@ README now says so.
 | Tool | Kymatics fit | Status |
 | :--- | :--- | :--- |
 | **authsweep** | Lavoix (FastAPI) | ✅ Works. Found 2 unauthenticated paid endpoints, and a false-clean bug in itself. |
+| **authsweep** | Otter control plane | ✅ Works now — the Rust front-end was written for this. 38 routes, 3 high, no authorization anywhere. Found the *second* false clean on the way. |
 | **preflight** | Otter cost model | ✅ Pricing export shipped. ⏳ Calibration loop unbuilt — highest-value next step. |
 | **decorrelate** | Otter evals | ➖ Nothing to add; Otter already uses an executable oracle. |
 | **graphlint** | Otter jobs | ➖ Does not apply — single-prompt jobs are not graphs. |
-| **authsweep** | Otter control plane | ❌ Blocked — needs a Rust/axum front-end. Found a second false-clean bug on the way. |
 
-Two of five help. But the most useful thing that came out of the exercise was not
-an integration at all: **pointing a security tool at our own stack found two bugs
-in the security tool**, both of the single class its own threat model calls the
-worst one — a false clean.
+Three of five help. But the most useful thing that came out of the exercise was
+not an integration at all: **pointing a security tool at our own stack found two
+bugs in the security tool**, both of the single class its own threat model calls
+the worst one — a false clean.
 
 - Against Lavoix it mis-read dependency injection as an auth guard and reported a
   clean bill of health over two open billing endpoints.
@@ -229,5 +271,23 @@ worst one — a false clean.
 
 Neither was reachable from the fixtures, because the fixtures were written by the
 same person who wrote the rules and inherited the same blind spots. Real code had
-shapes the author did not think to invent. That is the argument for dogfooding,
-stated more sharply than any README could put it.
+shapes the author did not think to invent. And fixing the second one surfaced
+three more defects — a guard scoped to the wrong region, a public-path list that
+broke as soon as prefixes resolved, and a severity model that could not tell
+remote code execution from a record insert.
+
+That is the argument for dogfooding, stated more sharply than any README could
+put it. It is also the argument for writing the negatives down: the two rows in
+the table above that say "does not apply" are the reason you can believe the
+three that say it does.
+
+## What is still unbuilt
+
+- **preflight ← Otter calibration.** Otter measures the token counts preflight
+  guesses at. An exporter from measured usage to `preflight.json` is small and is
+  the highest-value item here.
+- **Otter has no authorization.** The scan above is the argument, not the fix.
+  Whether it needs one depends on whether it stays a localhost tool.
+- **decorrelate stays on the shelf** until a model judge enters Otter's eval
+  scoring. Until then the executable oracle is the better instrument and the tool
+  has nothing to add.

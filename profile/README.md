@@ -26,8 +26,8 @@ enough of them to know where it goes wrong.
 
 The second half exists because of the first. Every tool below was written to fix
 something we hit shipping Kymatics — and when we pointed them back at our own
-stack, two of them found real bugs, [including two in
-`authsweep` itself](https://github.com/Unchained-Labs/.github/blob/main/docs/kymatics-and-the-graph-tools.md).
+stack they found real bugs in the product *and* [two in the scanner
+itself](https://github.com/Unchained-Labs/.github/blob/main/docs/kymatics-and-the-graph-tools.md).
 
 ## Kymatics — the product
 
@@ -67,7 +67,7 @@ independent, nothing linted the spec for the handful of mistakes everyone makes.
 | **[graphlint](https://github.com/Unchained-Labs/graphlint)** | Static analyzer for agent workflow specs. Catches barrier misuse, correlated verifiers, missing schemas and non-terminating cycles — before a token is spent. 16 rules, SARIF output. | [site](https://unchained-labs.github.io/graphlint/) | `alpha` |
 | **[preflight](https://github.com/Unchained-Labs/preflight)** | Prices a workflow before it runs and comments the predicted agent count and dollar cost on the PR that changed it. Dependabot, but for agent spend. | [site](https://unchained-labs.github.io/preflight/) | `alpha` |
 | **[decorrelate](https://github.com/Unchained-Labs/decorrelate)** | Measures whether your verifiers are actually independent. Three skeptics sharing a model and a prompt are one check at 3× the price — this puts a number on it. | [site](https://unchained-labs.github.io/decorrelate/) | `alpha` |
-| **[authsweep](https://github.com/Unchained-Labs/authsweep)** | Finds route handlers with no authorization check. Deterministic, zero tokens, evidence on every finding. | [site](https://unchained-labs.github.io/authsweep/) | `alpha` |
+| **[authsweep](https://github.com/Unchained-Labs/authsweep)** | Finds route handlers with no authorization check across JS/TS, Python and Rust — Express, Fastify, Koa, FastAPI, Flask, axum, actix-web, rocket. Deterministic, zero tokens, evidence on every finding. | [site](https://unchained-labs.github.io/authsweep/) | `alpha` |
 | **[workflow-hub](https://github.com/Unchained-Labs/workflow-hub)** | Six agent workflows worth copying, one per shape. You own the file after it lands. | [site](https://unchained-labs.github.io/workflow-hub/) | `alpha` |
 | **[branding](https://github.com/Unchained-Labs/branding)** | The brand system. Measured contrast, computed geometry, tested docs. | [site](https://unchained-labs.github.io/branding/) | `v1` |
 
@@ -106,16 +106,22 @@ it was built for. We ran all five against Kymatics and
 | Tool | On Kymatics | Outcome |
 | :--- | :--- | :--- |
 | **authsweep** → Lavoix | ✅ | Found two unauthenticated endpoints doing paid provider work. |
+| **authsweep** → Otter | ✅ | 38 routes, 3 `high`, no authorization anywhere — two endpoints that accept a command and run it, plus a shell over a websocket. Invisible until the tool learned to read Rust, which it did *because of* this exercise. |
 | **preflight** ↔ Otter | ✅ | `preflight models --format otter-env` now feeds Otter's price list, so cost is quoted from one CI-checked table instead of two. |
 | **decorrelate** → Otter evals | ➖ | Nothing to add. Otter's evals already score against an executable oracle, which is the answer decorrelate would have given. |
 | **graphlint** → Otter jobs | ➖ | Does not apply. A single-prompt job is not a graph. |
-| **authsweep** → Otter | ❌ | Blocked — it cannot read Rust, so the control plane is invisible to it. |
 
-Two of five helped. The most valuable result was not an integration at all:
+Three of five help. The most valuable result was still not an integration:
 **pointing a security scanner at our own code found two bugs in the scanner**,
-both of the one class its own threat model calls the worst — a false clean. Neither
-was reachable from its fixtures, because the fixtures were written by the same
-person as the rules and inherited the same blind spots.
+both of the one class its own threat model calls the worst — a false clean. On
+Lavoix it read dependency injection as an auth guard; on Otter it found no routes
+at all and called that a pass.
+
+Neither was reachable from its fixtures, because the fixtures were written by the
+same person as the rules and inherited the same blind spots. Fixing the second one
+surfaced three more defects, including a severity model that could not tell remote
+code execution from a record insert. The two `➖` rows are the reason you can
+believe the three `✅` ones.
 
 ## The argument, in six lines
 
