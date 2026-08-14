@@ -107,7 +107,7 @@ it was built for. We ran all five against Kymatics and
 | :--- | :--- | :--- |
 | **authsweep** → Lavoix | ✅ | Found two unauthenticated endpoints doing paid provider work. |
 | **authsweep** → Otter | ✅ | 38 routes, 3 `high`, no authorization anywhere — two endpoints that accept a command and run it, plus a shell over a websocket. Invisible until the tool learned to read Rust, which it did *because of* this exercise. |
-| **preflight** ↔ Otter | ✅ | `preflight models --format otter-env` now feeds Otter's price list, so cost is quoted from one CI-checked table instead of two. |
+| **preflight** ↔ Otter | ✅ | Both directions. `preflight models --format otter-env` feeds Otter's price list, so cost is quoted from one CI-checked table instead of two — and `preflight calibrate` reads Otter's measured per-job usage back, replacing guessed token profiles with what our own runs cost. Prices out, measurements in. |
 | **decorrelate** → Otter evals | ➖ | Nothing to add. Otter's evals already score against an executable oracle, which is the answer decorrelate would have given. |
 | **graphlint** → Otter jobs | ➖ | Does not apply. A single-prompt job is not a graph. |
 

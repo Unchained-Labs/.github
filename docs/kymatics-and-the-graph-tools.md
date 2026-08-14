@@ -121,19 +121,50 @@ after 2026-08-31 the exporter emits Sonnet 5 at `3:15` rather than the
 promotional `2:10`, because exporting an expired rate would make Otter's cost
 reporting quietly under-report.
 
-### What is not built yet: the calibration loop
+### The loop closes in the other direction too
 
 preflight's most honest documented weakness is that its token profiles are
-generic — its README tells you to run one real workflow, read the actual counts
-out of your spans, and put them in `preflight.json`.
+generic — its README told you to run one real workflow, read the actual counts out
+of your spans, and put them in `preflight.json`. Which is manual arithmetic, so
+nobody did it.
 
-**Otter is a machine that produces exactly those spans.** `otter_tokens_total`
-and the per-job `TokenUsage` parsed out of the agent transcript are the
-calibration data preflight asks for and cannot generate on its own. An exporter
-in the other direction — Otter's measured usage → a `preflight.json` — would turn
-preflight from "generic defaults" into "calibrated against our own runs".
+**Otter is a machine that produces exactly those spans.** `GET /v1/jobs/{id}/usage`
+returns normalised `prompt_tokens` / `completion_tokens` per job, which is the
+calibration data preflight asks for and cannot generate on its own. So
+`preflight calibrate` now reads it:
 
-That is the highest-value unbuilt thing in this document, and it is small.
+```sh
+for id in $(cat job-ids); do curl -s "$OTTER/v1/jobs/$id/usage"; done \
+  | jq -s . | preflight calibrate - --kind worker --out preflight.json
+```
+
+```
+  calibrating the worker profile from 23 measured call(s)
+
+             assumed   measured   change   p10–p90
+  input         8000 →    16024    ×2.00   9845–35458
+  output         800 →      567    ×0.71   382–969
+
+  cacheHitRate  0.7 (unchanged)
+                not measurable from usage rows — nothing in them reports cache reads
+```
+
+Prices flow one way and measurements the other, which is the right split: a price
+is a published fact anyone can look up, and a token count only your own runs can
+tell you.
+
+The interesting part is what it refuses to do. It will not invent a
+`cacheHitRate`, because usage rows do not report cache reads and there is nothing
+to derive one from — and that is the single number the total is most sensitive to,
+so fabricating it would have been both the most useful-looking and the most
+dishonest thing available. It will not guess whether a job was a worker or a
+verifier, because a single-prompt job carries no such distinction; you name the
+kind. And below five samples it exits `1` and writes nothing, because a profile
+from two runs has the authority of a measurement and the accuracy of a guess.
+
+It writes the median rather than the mean: token distributions are right-skewed,
+and one run that filled a 400k context should not set the profile. The p10–p90
+spread is reported separately, since the tail is what blows a budget.
 
 ---
 
@@ -255,7 +286,7 @@ the shapes its author already thought of.
 | :--- | :--- | :--- |
 | **authsweep** | Lavoix (FastAPI) | ✅ Works. Found 2 unauthenticated paid endpoints, and a false-clean bug in itself. |
 | **authsweep** | Otter control plane | ✅ Works now — the Rust front-end was written for this. 38 routes, 3 high, no authorization anywhere. Found the *second* false clean on the way. |
-| **preflight** | Otter cost model | ✅ Pricing export shipped. ⏳ Calibration loop unbuilt — highest-value next step. |
+| **preflight** | Otter cost model | ✅ Both directions shipped. Prices flow out via `models --format otter-env`; Otter's measured usage flows back in via `preflight calibrate`. |
 | **decorrelate** | Otter evals | ➖ Nothing to add; Otter already uses an executable oracle. |
 | **graphlint** | Otter jobs | ➖ Does not apply — single-prompt jobs are not graphs. |
 
@@ -283,9 +314,11 @@ three that say it does.
 
 ## What is still unbuilt
 
-- **preflight ← Otter calibration.** Otter measures the token counts preflight
-  guesses at. An exporter from measured usage to `preflight.json` is small and is
-  the highest-value item here.
+- **A cache hit rate nobody can measure.** `preflight calibrate` closed the
+  token-count gap but deliberately left this one open: usage rows do not report
+  cache reads, and on the workloads we have measured it is the assumption the
+  total is most sensitive to. Closing it needs Otter to record cache-read tokens
+  separately, which means the provider stream has to report them.
 - **Otter has no authorization.** The scan above is the argument, not the fix.
   Whether it needs one depends on whether it stays a localhost tool.
 - **decorrelate stays on the shelf** until a model judge enters Otter's eval
