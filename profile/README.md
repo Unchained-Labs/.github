@@ -4,6 +4,7 @@
   <p><strong><a href="https://unchained-labs.github.io/">unchained-labs.github.io</a></strong></p>
   <p>
     <a href="https://kymatics.vercel.app">Kymatics</a> ·
+    <a href="https://unchained-labs.github.io/localflow/">localflow</a> ·
     <a href="https://unchained-labs.github.io/graphlint/">graphlint</a> ·
     <a href="https://unchained-labs.github.io/preflight/">preflight</a> ·
     <a href="https://unchained-labs.github.io/decorrelate/">decorrelate</a> ·
@@ -64,6 +65,7 @@ independent, nothing linted the spec for the handful of mistakes everyone makes.
 
 | | What it does | Docs | Status |
 | :--- | :--- | :--- | :--- |
+| **[localflow](https://github.com/Unchained-Labs/localflow)** | A Kanban board for the Claude Code sessions already running on your machine. Live lanes, cost priced from real token counts, and the fan-out that actually happened, exported as a graph spec. | [site](https://unchained-labs.github.io/localflow/) | `alpha` |
 | **[graphlint](https://github.com/Unchained-Labs/graphlint)** | Static analyzer for agent workflow specs. Catches barrier misuse, correlated verifiers, missing schemas and non-terminating cycles — before a token is spent. 16 rules, SARIF output. | [site](https://unchained-labs.github.io/graphlint/) | `alpha` |
 | **[preflight](https://github.com/Unchained-Labs/preflight)** | Prices a workflow before it runs and comments the predicted agent count and dollar cost on the PR that changed it. Dependabot, but for agent spend. | [site](https://unchained-labs.github.io/preflight/) | `alpha` |
 | **[decorrelate](https://github.com/Unchained-Labs/decorrelate)** | Measures whether your verifiers are actually independent. Three skeptics sharing a model and a prompt are one check at 3× the price — this puts a number on it. | [site](https://unchained-labs.github.io/decorrelate/) | `alpha` |
@@ -80,22 +82,33 @@ flowchart LR
   H["workflow-hub<br><small>get a graph</small>"] --> G["graphlint<br><small>is it correct?</small>"]
   G --> P["preflight<br><small>what will it cost?</small>"]
   P --> R(["run it"])
-  R --> D["decorrelate<br><small>were the verifiers independent?</small>"]
+  R --> L["localflow<br><small>what is it doing, and what did it spend?</small>"]
+  L --> D["decorrelate<br><small>were the verifiers independent?</small>"]
+  L -.->|the graph that ran| G
+  L -.->|measured cache rate| P
   D -.->|tune the lenses| G
   A["authsweep<br><small>a graph worth running</small>"] --> G
 ```
 
-Four stages, and each answers a question you currently cannot answer:
+Five stages, and each answers a question you currently cannot answer:
 
 - **Before you write it** — start from a graph that already works.
 - **Before you merge it** — does it contain the mistakes everyone makes?
 - **Before you run it** — what is this going to cost, and which stage dominates?
+- **While it runs** — which of your sessions is working, which is waiting on you,
+  and which one has quietly spent more than the rest of the week?
 - **After you run it** — did the verification you paid for actually buy anything?
+
+The loop closes at the end. localflow reconstructs the fan-out a session
+*actually performed* and hands it back to graphlint, so the linter finally sees
+graphs that ran rather than only the ones people wrote down — and it measures the
+cache hit rate preflight could not derive.
 
 The family is self-consistent, and that is enforced rather than claimed:
 `authsweep` emits a verify graph that `graphlint` lints clean and `preflight`
-prices, and every workflow in `workflow-hub` passes `graphlint` with zero
-findings. CI fails if any of that stops being true.
+prices; every workflow in `workflow-hub` passes `graphlint` with zero findings;
+and `localflow` holds the same price table as `preflight`, asserted string for
+string. CI fails if any of that stops being true.
 
 ## What happened when we pointed them at our own product
 
@@ -107,11 +120,20 @@ it was built for. We ran all five against Kymatics and
 | :--- | :--- | :--- |
 | **authsweep** → Lavoix | ✅ | Found two unauthenticated endpoints doing paid provider work. |
 | **authsweep** → Otter | ✅ | 38 routes, 3 `high`, no authorization anywhere — two endpoints that accept a command and run it, plus a shell over a websocket. Invisible until the tool learned to read Rust, which it did *because of* this exercise. |
+| **localflow** → Otter | ✅ | Found Otter counting 48× fewer input tokens than a cached run sends, and reporting 12× less than it cost — it read `input_tokens` and ignored the prompt cache entirely. [PR open](https://github.com/Unchained-Labs/otter/pull/20), checked against the provider's own figure. |
 | **preflight** ↔ Otter | ✅ | Both directions. `preflight models --format otter-env` feeds Otter's price list, so cost is quoted from one CI-checked table instead of two — and `preflight calibrate` reads Otter's measured per-job usage back, replacing guessed token profiles with what our own runs cost. Prices out, measurements in. |
 | **decorrelate** → Otter evals | ➖ | Nothing to add. Otter's evals already score against an executable oracle, which is the answer decorrelate would have given. |
 | **graphlint** → Otter jobs | ➖ | Does not apply. A single-prompt job is not a graph. |
 
-Three of five help. The most valuable result was still not an integration:
+Four of six help, and the newest one paid for itself twice. Pointing localflow at
+the same machine that runs everything else found a **third-of-the-bill error in
+preflight** — a cache write is billed by how long it lives, and a single 1.25×
+multiplier is only right for the five-minute tier — and then found Otter ignoring
+prompt-cache traffic altogether, which is most of what an agent run sends.
+
+Both were caught the same way: `claude -p --output-format json` reports what a
+run actually cost, which turns a guess into something you can check. The most
+valuable result was still not an integration:
 **pointing a security scanner at our own code found two bugs in the scanner**,
 both of the one class its own threat model calls the worst — a false clean. On
 Lavoix it read dependency injection as an auth guard; on Otter it found no routes
