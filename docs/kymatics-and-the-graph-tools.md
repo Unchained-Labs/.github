@@ -4,15 +4,20 @@ Written August 2026, after building the five graph tools and then pointing them 
 our own product. The question was whether they actually help Kymatics or whether
 they are a separate hobby that happens to live in the same org.
 
-**Short answer: three of the five help today, two of those found real bugs on
-first contact, and two do not apply at all yet.** The negatives are the useful
-part of this document — a report where all five tools turned out to help would
-tell you nothing except that the author wanted them to.
+**Short answer: four of the six tools help today, three of them found real bugs
+on first contact, and two do not apply at all yet.** The negatives are the useful
+part of this document — a report where everything turned out to help would tell
+you nothing except that the author wanted it to.
 
-The third only counts because the exercise itself produced the missing piece:
-authsweep could not read Rust, so it was written to. That is the honest shape of
-dogfooding — the gap was not "Otter needs work", it was "our tool cannot see
-our own control plane".
+Two of those four only count because the exercise itself produced the missing
+piece. authsweep could not read Rust, so it was written to. localflow did not
+exist, and building it produced an oracle — a way to check a cost figure against
+what the provider says a run actually cost — which then found a third-of-the-bill
+error in preflight and a twelvefold one in Otter.
+
+That is the honest shape of dogfooding. Twice now the gap was not "Kymatics needs
+work", it was "our own tool cannot see, or cannot count, the thing it exists to
+measure".
 
 ## The stack, for orientation
 
@@ -280,18 +285,109 @@ the shapes its author already thought of.
 
 ---
 
+## 6. localflow → Otter — the biggest error the family has found in itself
+
+**Status: fixed, pending review.**
+
+[localflow](https://github.com/Unchained-Labs/localflow) was built to watch the
+Claude Code sessions on a laptop, which meant learning to price them from their
+own transcripts. That turned out to be the useful part, because pricing a run you
+can check produces an oracle: `claude -p --output-format json` reports
+`total_cost_usd` for the turn it just did, so the arithmetic either lands on the
+provider's number or it does not.
+
+Two things did not land.
+
+### preflight was a third light on every cached workload
+
+A cache write is billed by **how long the entry lives** — 2× the input rate for
+the one-hour tier against 1.25× for the five-minute default. preflight shipped a
+single `cacheWriteMultiplier` of 1.25, which is correct for one of those and
+wrong for the other:
+
+```
+  531 input + 22188 cache-read + 3026 cache-write(1h) + 51 output, haiku
+
+  1.25×  →  $0.0067873000
+  2.00×  →  $0.0090568000
+  CLI    →  $0.0090568000
+```
+
+Fixed with a `cacheTtl` assumption and both multipliers. The default stays `5m`,
+because that is the API default and defaulting to the dearer tier would
+over-report every ordinary run. An existing `preflight.json` that pins the old
+single multiplier is honoured exactly as written — a number somebody chose
+deliberately must not move because the tool learned something.
+
+### Otter was counting a fraction of what it sends
+
+`otter-core/src/usage.rs` read `input_tokens` and `output_tokens` and stopped.
+An Anthropic usage object also carries `cache_read_input_tokens` and
+`cache_creation_input_tokens`, and on an agentic run those are not a minority of
+the input — they are almost all of it:
+
+| | measured |
+| :--- | ---: |
+| `input_tokens` | 531 |
+| `cache_read_input_tokens` | 22,188 |
+| `cache_creation_input_tokens` | 3,026 |
+| **Otter counted** | **531** — 48× short |
+| **Otter would report** | **$0.000786** |
+| **The provider reported** | **$0.0090568** — 12× short |
+
+So `otter_tokens_total` was reporting a fraction of what was sent, and
+`otter_estimated_cost_usd_total` was, for a cached workload, not far off just the
+output cost. Those are precisely the two numbers you would use to decide whether
+a job was worth running, which makes this the most expensive kind of quiet wrong.
+
+[PR #20](https://github.com/Unchained-Labs/otter/pull/20) adds cache counters to
+`TokenUsage`, prices all three tiers, and keeps `prompt_tokens` meaning fresh
+input so nothing already reading it changes. No schema migration — persisting the
+cache counts separately is worth doing next, but the numbers are wrong *now*. The
+cost test asserts against the provider's own figure rather than against a
+hand-computed expectation, so it cannot drift into agreeing with a bug.
+
+It is open as a PR rather than pushed, because it is a live service and the fix
+deserves a read before it changes anybody's dashboards.
+
+### And graphlint finally sees graphs that ran
+
+Every fan-out Claude Code performs is recorded in the transcript, so
+`localflow graph <session>` reconstructs it and emits the declarative spec
+graphlint already lints and preflight already prices:
+
+```sh
+localflow graph 62173ece | graphlint check -
+localflow graph 62173ece | preflight estimate -
+```
+
+Both tools grew stdin support for this, because the docs claimed that pipeline
+before it worked and a claim in a recording is still a claim.
+
+The distinction that matters: a spec is a statement of *intent*, and until now
+that is all graphlint could read. This is the graph that actually happened — and
+each observed sequence arrives as `barrier: true` with a reason beginning
+`observed:`, a measurement rather than an opinion about whether the barrier was
+needed. Deciding that was always `unjustified-barrier`'s job; it is a far more
+interesting question when the barrier definitely occurred.
+
+---
+
 ## Summary
 
 | Tool | Kymatics fit | Status |
 | :--- | :--- | :--- |
+| **localflow** | Otter cost accounting | ✅ Found Otter counting 48× fewer input tokens than a cached run sends, and 12× less cost. [PR open](https://github.com/Unchained-Labs/otter/pull/20). |
+| **localflow** | preflight cache model | ✅ Found the 1.25× cache-write multiplier a third light for 1-hour caching, and measured the cache hit rate preflight called underivable. |
+| **localflow** | graphlint's input | ✅ Reconstructs the fan-out a session actually ran, as a spec graphlint lints and preflight prices. |
 | **authsweep** | Lavoix (FastAPI) | ✅ Works. Found 2 unauthenticated paid endpoints, and a false-clean bug in itself. |
 | **authsweep** | Otter control plane | ✅ Works now — the Rust front-end was written for this. 38 routes, 3 high, no authorization anywhere. Found the *second* false clean on the way. |
 | **preflight** | Otter cost model | ✅ Both directions shipped. Prices flow out via `models --format otter-env`; Otter's measured usage flows back in via `preflight calibrate`. |
 | **decorrelate** | Otter evals | ➖ Nothing to add; Otter already uses an executable oracle. |
 | **graphlint** | Otter jobs | ➖ Does not apply — single-prompt jobs are not graphs. |
 
-Three of five help. But the most useful thing that came out of the exercise was
-not an integration at all: **pointing a security tool at our own stack found two
+Six of eight pairings help now. But the most useful thing that came out of the
+exercise was still not an integration: **pointing a security tool at our own stack found two
 bugs in the security tool**, both of the single class its own threat model calls
 the worst one — a false clean.
 
@@ -314,11 +410,16 @@ three that say it does.
 
 ## What is still unbuilt
 
-- **A cache hit rate nobody can measure.** `preflight calibrate` closed the
-  token-count gap but deliberately left this one open: usage rows do not report
-  cache reads, and on the workloads we have measured it is the assumption the
-  total is most sensitive to. Closing it needs Otter to record cache-read tokens
-  separately, which means the provider stream has to report them.
+- **Otter should persist the cache counts, not just price them.**
+  [PR #20](https://github.com/Unchained-Labs/otter/pull/20) fixes the arithmetic
+  without a migration, so `job_usage` still has nowhere to record how much of a
+  run was cached. That is one migration and an endpoint field away, and it is
+  what would let `/v1/jobs/{id}/usage` answer the question localflow can already
+  answer locally.
+- **A cache hit rate for workloads nobody watches.** localflow measures it from
+  Claude Code transcripts. For a run that happens somewhere else, it is still a
+  declared guess — which is why the Otter change above matters beyond its own
+  dashboards.
 - **Otter has no authorization.** The scan above is the argument, not the fix.
   Whether it needs one depends on whether it stays a localhost tool.
 - **decorrelate stays on the shelf** until a model judge enters Otter's eval
